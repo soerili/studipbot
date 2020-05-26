@@ -1,0 +1,11 @@
+{
+    "hello":{
+        "message": "Hello Human! I also like human activities like drinking fluid.",
+        "help": "Begrüsst den Nutzer."
+    },
+    "help": {
+        "message": "Ich beherrsche folgende Befehle:",
+        "help": "Zeigt Hilfen zu den verschiedenen Befehlen an und spendet den Nutzern Trost.",
+        "reply_function": "get_help_command_reply"
+    }
+}
