@@ -1,0 +1,24 @@
+db_file: studip.db
+directory: studip/data/
+url: https://elearning.uni-oldenburg.de/api.php/
+semester: Sommersemester 2020
+module:
+    Stochastik: Stochastik
+    IS2: Informationssysteme II
+    Informationssysteme: Informationssysteme II
+    Informationssysteme 2: Informationssysteme II
+    Webprogrammierung: Webprogrammierung
+    WP: Webprogrammierung
+    Betriebssysteme: Betriebssysteme I
+    BS: Betriebssysteme I
+    TI: Technische Informatik
+    Technische Informatik: Technische Informatik
+    KI: Einführung in die Künstliche Intelligenz
+    BPL: Beschaffung, Produktion und Logistik
+    SWT2: Softwaretechnik II
+    Softwaretechnik: Softwaretechnik II
+    DBPrak: Fortgeschrittenenpraktikum Datenbanken (MSc)
+    Datenbank Praktikum: Fortgeschrittenenpraktikum Datenbanken (MSc)
+    RTS: Real-Time Systems
+    Rechnernetze: Rechnernetze
+    RN: Rechnernetze
