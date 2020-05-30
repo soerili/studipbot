@@ -6,6 +6,7 @@ import datetime
 import sqlite3
 import studip_secrets as secrets
 from configuration import Configuration
+import discord
 
 CONFIG = Configuration.from_yaml_file('studip_config.yml')
 data_directory = CONFIG.get('directory')
@@ -19,9 +20,10 @@ def init():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            'CREATE TABLE IF NOT EXISTS modules (course_id text, number text, title text, lecturers text, UNIQUE(course_id))')
+            'CREATE TABLE IF NOT EXISTS courses (course_id text, number text, title text, lecturers text, UNIQUE(course_id))')
+        conn.commit()
         cursor.execute(
-            'CREATE TABLE IF NOT EXISTS users (discord_id int, username text, studip_id text, UNIQUE(discord_id))')
+            'CREATE TABLE IF NOT EXISTS users (discord_id text, studip_id text, UNIQUE(discord_id))')
         conn.commit()
     except sqlite3.Error as error:
         print(error)
@@ -32,9 +34,16 @@ def init():
 
 
 def setup_user(user, username, password):
-    secrets.input_user(user, username, password)
-    input_user(user, username)
-    input_courses(user)
+    if is_in_db(user):
+        input_courses(user)
+        return False
+    r = api_request('/user', (username, password))
+    if r:
+        secrets.input_user(user, username, password)
+        input_user(user, r['user_id'])
+        input_courses(user)
+        return True
+    return False
 
 
 def get_db_connection():
@@ -45,6 +54,8 @@ def api_request(path, user_auth):
     try:
         print(url + path, user_auth)
         r = requests.get(url + path, auth=user_auth)
+        if r.status_code != 200:
+            return None
         data = r.json()
         print(data)
         try:
@@ -66,7 +77,7 @@ def is_in_db(user):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT username FROM users WHERE discord_id = ?', (user.id,))
+        cursor.execute('SELECT * FROM users WHERE discord_id = ?', (user,))
         userdata = cursor.fetchone()
         return True if userdata else False
     except sqlite3.Error as error:
@@ -77,14 +88,12 @@ def is_in_db(user):
             conn.close()
 
 
-def input_user(user, username):
-    r = api_request('user', secrets.get_user_login(user))
-    user_id = r['user_id']
+def input_user(user, user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO users(discord_id,username,studip_id) VALUES (?,?,?)',
-                       (user.id, user.name, user_id))
+        cursor.execute('INSERT INTO users(discord_id, studip_id) VALUES (?,?)',
+                       (user, user_id))
         conn.commit()
     except sqlite3.Error as error:
         print(error)
@@ -99,12 +108,20 @@ def input_courses(user):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        for key, value in data:
-            if value['type'] is 1:
-                cursor.execute('INSERT INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
-                               (value['id'], value['number'], value['title'], value['name']['formatted']))
-                conn.commit()
-                check_new_files(value['id'],)
+        print(data)
+        print(type(data))
+        if type(data) is dict:
+            for key, value in data.items():
+                if value['type'] is '1':
+                    cursor.execute('INSERT INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
+                                   (value['course_id'], value['number'], value['title'], next(iter(value['lecturers'].values()))['name']['formatted']))
+                    conn.commit()
+        if type(data) is list:
+            for value in data:
+                if value['type'] is '1':
+                    cursor.execute('INSERT INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
+                                   (value['course_id'], value['number'], value['title'], next(iter(value['lecturers'].values()))['name']['formatted']))
+                    conn.commit()
     except sqlite3.Error as error:
         print(error)
     finally:
@@ -127,7 +144,9 @@ def get_semester(user):
     else:
         r = api_request('semesters', secrets.get_user_login(user))
         for key, value in r.items():
-            if value['begin'] < int(datetime.datetime.utcnow().timestamp()) > value['end']:
+            print(value['begin'])
+            print(int(datetime.datetime.utcnow().timestamp()))
+            if value['begin'] <= int(datetime.datetime.utcnow().timestamp()) <= value['end']:
                 CONFIG.set('semester_id', value['id'])
                 return CONFIG.get('semester_id')
 
@@ -136,7 +155,7 @@ def get_studip_id(user):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT studip_id FROM users WHERE discord_id = ?', (user.id,))
+        cursor.execute('SELECT studip_id FROM users WHERE discord_id = ?', (user,))
         userdata = cursor.fetchone()
         return userdata[0]
     except sqlite3.Error as error:
@@ -192,6 +211,21 @@ def recursive_folder(folder_id, user, main_directory, new_files=None):
 </html>''')
 
     return new_files
+
+
+def get_news(user, course=None):
+    if course is None:
+        r = api_request('studip/news', secrets.get_user_login(user))
+        embed = discord.Embed(title='Global News')
+        titles = []
+        news_id = []
+        for key, value in r.items():
+            titles.append(value['topic'])
+            news_id.append(value['news_id'])
+        embed.add_field(name=titles[1], value=f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[1]}#{news_id[1]})', inline=False)
+        embed.add_field(name=titles[2], value=f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[2]}#{news_id[2]})', inline=False)
+        embed.add_field(name=titles[3], value=f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[3]}#{news_id[3]})', inline=False)
+        return embed
 
 
 # json_data = api_request('user/73d56ceb7dd2ed7d621efe9bed6232a6/courses', ('afji2257', 'werder12'))
