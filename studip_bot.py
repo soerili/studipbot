@@ -6,6 +6,7 @@ import studip_utility
 
 import logging
 import discord
+from exceptions import *
 from discord.ext import commands
 
 
@@ -17,6 +18,12 @@ logger.addHandler(handler)
 
 
 studIPBot = commands.Bot(command_prefix='!')
+
+
+def known_user():
+    async def predicate(ctx):
+        return studip_utility.is_in_db(str(ctx.author))
+    return commands.check(predicate)
 
 
 @studIPBot.event
@@ -31,23 +38,41 @@ async def on_ready():
 @studIPBot.group()
 async def studip(ctx):
     if ctx.invoked_subcommand is None:
-        print(ctx.author)
         await ctx.send('Help is on the way!')
 
 
 @studip.command()
+@known_user()
 async def files(ctx):
     await ctx.send('Files are on the way!')
 
 
 @studip.command()
+@known_user()
 async def forum(ctx):
     await ctx.send('Not yet implemented!')
 
 
 @studip.command()
-async def news(ctx):
-    await ctx.send(embed=studip_utility.get_news(str(ctx.author)))
+@known_user()
+async def news(ctx, arg1=None, arg2=1):
+    try:
+        arg1_int = int(arg1)
+        arg2 = arg1_int
+        arg1 = None
+    except ValueError:
+        pass
+    except TypeError:
+        pass
+    embed_news = studip_utility.get_news(str(ctx.author), arg1, arg2)
+    await ctx.send(embed=embed_news)
+
+
+@studip.command()
+@known_user()
+async def alias(ctx, arg1, arg2):
+    name = studip_utility.add_alias(arg1, arg2)
+    await ctx.send(f'Alias {arg1} für {name} erfolgreich hinzugefügt.')
 
 
 @studip.command()
@@ -69,6 +94,16 @@ async def login(ctx):
         await ctx.send('Login war erfolgreich, viel Spaß beim benutzen des Bots!')
     else:
         await ctx.send('Probier es bitte nochmal!')
+
+
+@news.error
+@files.error
+@forum.error
+async def studip_error(ctx, error):
+    if type(error.original) is AliasError:
+        await ctx.send(error.original.message + '\n' + studip_utility.formatted_courses_list())
+    else:
+        await ctx.send(error.original.message)
 
 studip_utility.init()
 with open('token', 'r') as token_file:

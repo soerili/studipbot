@@ -1,42 +1,30 @@
-import json
-import requests
-from requests.auth import HTTPBasicAuth
-import os
 import datetime
+import os
 import sqlite3
+
+import utility
+import discord
+import requests
+
 import studip_secrets as secrets
 from configuration import Configuration
-import discord
+from db_utility import DatabaseConnection
+from alias_resolver import AliasResolver
+from exceptions import *
 
 CONFIG = Configuration.from_yaml_file('studip_config.yml')
 data_directory = CONFIG.get('directory')
 db_file = CONFIG.get('db_file')
 url = CONFIG.get('url')
+alias_resolver = AliasResolver.from_yaml_file('aliases.yml')
+db = DatabaseConnection(data_directory, db_file)
 
 
 def init():
-    os.makedirs(data_directory, exist_ok=True)
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            'CREATE TABLE IF NOT EXISTS courses (course_id text, number text, title text, lecturers text, UNIQUE(course_id))')
-        conn.commit()
-        cursor.execute(
-            'CREATE TABLE IF NOT EXISTS users (discord_id text, studip_id text, UNIQUE(discord_id))')
-        conn.commit()
-    except sqlite3.Error as error:
-        print(error)
-    finally:
-        if conn:
-            conn.close()
     secrets.init()
 
 
 def setup_user(user, username, password):
-    if is_in_db(user):
-        input_courses(user)
-        return False
     r = api_request('/user', (username, password))
     if r:
         secrets.input_user(user, username, password)
@@ -46,18 +34,12 @@ def setup_user(user, username, password):
     return False
 
 
-def get_db_connection():
-    return sqlite3.connect(data_directory + db_file)
-
-
 def api_request(path, user_auth):
     try:
-        print(url + path, user_auth)
         r = requests.get(url + path, auth=user_auth)
         if r.status_code != 200:
             return None
         data = r.json()
-        print(data)
         try:
             if data['pagination']:
                 if data['pagination']['total'] > data['pagination']['offset'] + 50:
@@ -74,59 +56,37 @@ def api_request(path, user_auth):
 
 
 def is_in_db(user):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM users WHERE discord_id = ?', (user,))
-        userdata = cursor.fetchone()
-        return True if userdata else False
-    except sqlite3.Error as error:
-        print(error)
-        return False
-    finally:
-        if conn:
-            conn.close()
+    result = db.db_query('SELECT * FROM users WHERE discord_id = ?', (user,))
+    if result:
+        return True
+    return False
 
 
 def input_user(user, user_id):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO users(discord_id, studip_id) VALUES (?,?)',
-                       (user, user_id))
-        conn.commit()
-    except sqlite3.Error as error:
-        print(error)
-    finally:
-        if conn:
-            conn.close()
+    db.db_query('REPLACE INTO users(discord_id, studip_id) VALUES (?,?)', (user, user_id))
+
+
+def get_course_name(id):
+    result = db.db_query('SELECT title FROM courses WHERE course_id = ?', (id,))
+    return result
 
 
 def input_courses(user):
     data = api_request('user/' + get_studip_id(user) + '/courses?semester=' + get_semester(user),
                        secrets.get_user_login(user))
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        print(data)
-        print(type(data))
-        if type(data) is dict:
-            for key, value in data.items():
-                if value['type'] is '1':
-                    cursor.execute('INSERT INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
-                                   (value['course_id'], value['number'], value['title'], next(iter(value['lecturers'].values()))['name']['formatted']))
-                    conn.commit()
-        if type(data) is list:
-            for value in data:
-                if value['type'] is '1':
-                    cursor.execute('INSERT INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
-                                   (value['course_id'], value['number'], value['title'], next(iter(value['lecturers'].values()))['name']['formatted']))
-                    conn.commit()
-    except sqlite3.Error as error:
-        print(error)
-    finally:
-        if conn:
-            conn.close()
+
+    if type(data) is dict:
+        for key, value in data.items():
+            if value['type'] is '1':
+                db.db_query('INSERT OR IGNORE INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
+                               (value['course_id'], value['number'], value['title'],
+                                next(iter(value['lecturers'].values()))['name']['formatted']))
+    if type(data) is list:
+        for value in data:
+            if value['type'] is '1':
+                db.db_query('INSERT OR IGNORE INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
+                                   (value['course_id'], value['number'], value['title'],
+                                    next(iter(value['lecturers'].values()))['name']['formatted']))
 
 
 def recursive_items(dictionary):
@@ -144,26 +104,14 @@ def get_semester(user):
     else:
         r = api_request('semesters', secrets.get_user_login(user))
         for key, value in r.items():
-            print(value['begin'])
-            print(int(datetime.datetime.utcnow().timestamp()))
             if value['begin'] <= int(datetime.datetime.utcnow().timestamp()) <= value['end']:
                 CONFIG.set('semester_id', value['id'])
                 return CONFIG.get('semester_id')
 
 
 def get_studip_id(user):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT studip_id FROM users WHERE discord_id = ?', (user,))
-        userdata = cursor.fetchone()
-        return userdata[0]
-    except sqlite3.Error as error:
-        print(error)
-        return None
-    finally:
-        if conn:
-            conn.close()
+    query_result = db.db_query('SELECT studip_id FROM users WHERE discord_id = ?', (user,))
+    return query_result[0]
 
 
 def check_new_files(course, user, main_directory=data_directory):
@@ -193,7 +141,6 @@ def recursive_folder(folder_id, user, main_directory, new_files=None):
         if not os.path.isfile(main_directory + file['name']) and not os.path.isfile(
                 os.path.splitext(main_directory + file['name'])[0] + '.html'):
             new_files.append(file['name'])
-            print(new_files)
             if file['size'] < 8000000:
                 with open(main_directory + file['name'], mode='wb') as response_file:
                     r = requests.get(url + 'file/' + file['id'] + '/download', auth=secrets.get_user_login(user))
@@ -213,38 +160,60 @@ def recursive_folder(folder_id, user, main_directory, new_files=None):
     return new_files
 
 
-def get_news(user, course=None):
+def get_news(user, course=None, page=1):
+    # embed = discord.Embed(title="")
     if course is None:
         r = api_request('studip/news', secrets.get_user_login(user))
-        embed = discord.Embed(title='Global News')
-        titles = []
-        news_id = []
-        for key, value in r.items():
-            titles.append(value['topic'])
-            news_id.append(value['news_id'])
-        embed.add_field(name=titles[1], value=f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[1]}#{news_id[1]})', inline=False)
-        embed.add_field(name=titles[2], value=f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[2]}#{news_id[2]})', inline=False)
-        embed.add_field(name=titles[3], value=f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[3]}#{news_id[3]})', inline=False)
+        embed = discord.Embed(title='Globale Ankündigungen')
+    else:
+        r = api_request(f'course/{alias_resolver.get(course)}/news', secrets.get_user_login(user))
+        embed = discord.Embed(title=f'Ankündigungen von {get_course_name(alias_resolver.get(course))[0]}')
+    titles = []
+    news_id = []
+    bodies = []
+    if type(r) is list:
+        embed.description = 'Diese Veranstaltung hat noch keine Ankündigungen erstellt'
         return embed
+    for key, value in r.items():
+        titles.append(value['topic'])
+        news_id.append(value['news_id'])
+        bodies.append(value['body'])
+    for i in range(3):
+        try:
+            if course is None:
+                embed.add_field(name=titles[i + (page - 1) * 3],
+                                value=utility.remove_html_tags(bodies[i + (page - 1) * 3]) if len(
+                                    utility.remove_html_tags(bodies[i + (
+                                                page - 1) * 3])) < 1025 else f'[Full News](https://elearning.uni-oldenburg.de/dispatch.php/start?contentbox_type=news&contentbox_open={news_id[i + (page - 1) * 3]}#{news_id[i + (page - 1) * 3]})', inline=False)
+            else:
+                embed.add_field(name=titles[i + (page - 1) * 3],
+                                value=utility.remove_html_tags(bodies[i + (page - 1) * 3]) if len(
+                                    utility.remove_html_tags(bodies[i + (page - 1) * 3])) < 1025 else f"News zu lang um dargestellt zu werden, bitte geh zu [Studip](https://elearning.uni-oldenburg.de/dispatch.php/course/overview?cid={course})", inline=False)
+        except IndexError:
+            break
+    if len(embed.fields) is 0:
+        embed.description = 'Auf dieser Seite sind keine Ankündigungen mehr.'
+    return embed
 
 
-# json_data = api_request('user/73d56ceb7dd2ed7d621efe9bed6232a6/courses', ('afji2257', 'werder12'))
-# json_data = api_request('folder/c744f8d61a28cd77b1b8abf78a4b09b3/subfolders', ('afji2257','werder12'))
-# json_data = api_request('folder/42671366629332aaba3a58f9938b6085/files',('afji2257','werder12'))
-# for key, value in recursive_items(json_data):
-#    print(key, value)
-# print(json_data[0])
-# if json_data:
-#    for x in json_data:
-#        print(x['name'])
-#    print(key, value)
-#    print(value['type'])
-#    if value['type'] is '1':
-#        print(value)
-# if value['type'] is '1' and 'a2eae20475c9dc0f5a0bc24778e4d6a9' in value['start_semester']:
-#    print(value)
-#    print(type(key))
+def add_alias(alias, course):
+    query_result = db.db_query('SELECT course_id FROM courses WHERE number = ?', (course,))
+    if query_result:
+        alias_resolver.set(alias, query_result[0])
+    result = db.db_query('SELECT number, title FROM courses WHERE number = ?', (course,))
+    alias_resolver.to_yaml_file('aliases.yml')
+    return convert_list(result, ' ')
 
-#CONFIG.get(None)
-#test = check_new_files("546e25ec8421471f23f7067ebcc8e8ed", "Test2", data_directory)
-#print(test)
+
+def convert_list(list, seperator):
+    s = seperator.join(list)
+    return s
+
+
+def formatted_courses_list():
+    result = db.db_query('SELECT number, title FROM courses', fetchall=True)
+    course_list = []
+    for i in result:
+        course_list.append(convert_list(i, ' '))
+    formatted_string = convert_list(sorted(course_list), '\n')
+    return formatted_string

@@ -17,13 +17,11 @@ except FileNotFoundError:
 
 def init():
     os.makedirs(directory, exist_ok=True)
-    print('aids')
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        s = cursor.execute(
+        cursor.execute(
             'CREATE TABLE IF NOT EXISTS studip_users (id integer primary key, user text,username text, password text, UNIQUE(username))')
-        print(s)
         conn.commit()
     except sqlite3.Error as error:
         print(error)
@@ -38,7 +36,7 @@ def input_user(user, username, password):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO studip_users(user,username,password) VALUES (?,?,?)',
+        cursor.execute('REPLACE INTO studip_users(user,username,password) VALUES (?,?,?)',
                        (user, username, encrypted_pwd))
         conn.commit()
     except sqlite3.Error as error:
