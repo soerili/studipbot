@@ -23,3 +23,9 @@ class ArgumentError(Exception):
     def __init__(self, command):
         self.command = command
         self.message = f'Bei der Benutzung von {command} wurde eine falsche Anzahl an Argumenten übergeben. \nWenn du dir nicht sicher bist, benutze `!studip` um dir die Benutzung von Befehlen anzuzeigen'
+        super().__init__(self.message)
+
+
+class ApiError(Exception):
+    def __init__(self):
+        super().__init__('Die Verbindung mit der API ist fehlgeschlagen. Entweder ist dein Passwort falsch, die API momentan nicht erreichbar oder du hast dieses Modul garnicht belegt.')

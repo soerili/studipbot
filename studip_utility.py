@@ -2,6 +2,8 @@ import datetime
 import os
 import sqlite3
 
+from os import listdir
+
 import utility
 import discord
 import requests
@@ -38,7 +40,7 @@ def api_request(path, user_auth):
     try:
         r = requests.get(url + path, auth=user_auth)
         if r.status_code != 200:
-            return None
+            raise ApiError
         data = r.json()
         try:
             if data['pagination']:
@@ -114,14 +116,23 @@ def get_studip_id(user):
     return query_result[0]
 
 
+def get_local_folders(course):
+    if os.path.exists(data_directory + course):
+        return course, listdir(data_directory + course)
+
+
 def check_new_files(course, user, main_directory=data_directory):
-    data = api_request('course/' + course + '/top_folder', secrets.get_user_login(user))
+    course_id = course
+    if not db.db_query('SELECT * FROM courses WHERE course_id = ?', (course,)):
+        course_id = alias_resolver.get(course_id)
+    data = api_request('course/' + course_id + '/top_folder', secrets.get_user_login(user))
     if not os.path.exists(main_directory + data['id']):
         os.mkdir(main_directory + data['id'])
     return recursive_folder(data['id'], user, main_directory + data['id'] + '/')
 
 
 def recursive_folder(folder_id, user, main_directory, new_files=None):
+    print("recursive folder")
     if new_files is None:
         new_files = []
     data = api_request('folder/' + folder_id + '/subfolders', secrets.get_user_login(user))
@@ -138,14 +149,15 @@ def recursive_folder(folder_id, user, main_directory, new_files=None):
                 recursive_folder(value['id'], user, main_directory + value['name'] + '/', new_files)
     files = api_request('folder/' + folder_id + '/files', secrets.get_user_login(user))
     for file in files:
+        print("file")
         if not os.path.isfile(main_directory + file['name']) and not os.path.isfile(
                 os.path.splitext(main_directory + file['name'])[0] + '.html'):
-            new_files.append(file['name'])
             if file['size'] < 8000000:
                 with open(main_directory + file['name'], mode='wb') as response_file:
                     r = requests.get(url + 'file/' + file['id'] + '/download', auth=secrets.get_user_login(user))
                     response_file.write(r.content)
-                    print("Download von: " + file['name'])
+                print("Download von: " + file['name'])
+                new_files.append(discord.File(main_directory + file['name']))
             else:
                 with open(os.path.splitext(main_directory + file['name'])[0] + '.html', 'w') as response_file:
                     link = url + 'file/' + file['id'] + '/download'
@@ -156,6 +168,7 @@ def recursive_folder(folder_id, user, main_directory, new_files=None):
       </script>
    </body>
 </html>''')
+                new_files.append(discord.File(main_directory + os.path.splitext(file['name'])[0] + '.html'))
 
     return new_files
 

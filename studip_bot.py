@@ -35,16 +35,29 @@ async def on_ready():
     await studIPBot.change_presence(activity=discord.Streaming(name="Python Programming!", url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
 
 
-@studIPBot.group()
+@studIPBot.group(aliases=['s'])
 async def studip(ctx):
+    print(type(ctx.author))
     if ctx.invoked_subcommand is None:
         await ctx.send('Help is on the way!')
 
 
 @studip.command()
 @known_user()
-async def files(ctx):
-    await ctx.send('Files are on the way!')
+async def update(ctx, arg):
+    file_list = studip_utility.check_new_files(arg, str(ctx.author))
+    print(file_list)
+    if file_list:
+        await ctx.send('Es gibt folgende neue Dateien für dich:')
+        await ctx.send(files=file_list)
+
+
+@studip.command()
+@known_user()
+async def files(ctx, arg):
+    studip_utility.get_local_folders(arg)
+    def show_files(folder):
+        print()
 
 
 @studip.command()
@@ -97,13 +110,14 @@ async def login(ctx):
 
 
 @news.error
-@files.error
+@update.error
 @forum.error
 async def studip_error(ctx, error):
     if type(error.original) is AliasError:
         await ctx.send(error.original.message + '\n' + studip_utility.formatted_courses_list())
     else:
         await ctx.send(error.original.message)
+
 
 studip_utility.init()
 with open('token', 'r') as token_file:
