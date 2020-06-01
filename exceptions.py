@@ -26,6 +26,6 @@ class ArgumentError(Exception):
         super().__init__(self.message)
 
 
-class ApiError(Exception):
+class APIError(Exception):
     def __init__(self):
         super().__init__('Die Verbindung mit der API ist fehlgeschlagen. Entweder ist dein Passwort falsch, die API momentan nicht erreichbar oder du hast dieses Modul garnicht belegt.')

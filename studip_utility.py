@@ -40,7 +40,7 @@ def api_request(path, user_auth):
     try:
         r = requests.get(url + path, auth=user_auth)
         if r.status_code != 200:
-            raise ApiError
+            raise APIError
         data = r.json()
         try:
             if data['pagination']:
