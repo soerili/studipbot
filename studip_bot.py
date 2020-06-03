@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import pickle
@@ -8,13 +9,6 @@ import logging
 import discord
 from exceptions import *
 from discord.ext import commands
-
-
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-logger.addHandler(handler)
 
 
 studIPBot = commands.Bot(command_prefix='!')
@@ -56,8 +50,22 @@ async def update(ctx, arg):
 @known_user()
 async def files(ctx, arg):
     studip_utility.get_local_folders(arg)
-    def show_files(folder):
-        print()
+
+    async def show_folder(folder):
+        msg = await ctx.send('123')
+        # await msg.add_reaction('\N{THUMBS UP SIGN}')
+
+        def check(reaction, user):
+            print(reaction.message + '###' + msg)
+            return reaction.message is msg and user is ctx.author
+        try:
+            reaction, user = studIPBot.wait_for('reaction_add', timeout=20.0, check=check)
+            print(reaction.message + '###' + user)
+        except asyncio.TimeoutError:
+            await ctx.send('nenenene')
+        else:
+            await ctx.send('jajajaja')
+    await show_folder(arg)
 
 
 @studip.command()
@@ -97,7 +105,7 @@ async def login(ctx):
 
     try:
         msg = await studIPBot.wait_for('message', timeout=30, check=check)
-    except:
+    except asyncio.TimeoutError:
         await ctx.send('Timeout für Login Eingabe abgelaufen, bitte versuche es erneut')
         return
     if msg is None:
