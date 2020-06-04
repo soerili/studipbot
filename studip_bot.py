@@ -8,10 +8,16 @@ import studip_utility
 import logging
 import discord
 from exceptions import *
-from discord.ext import commands
+from discord.ext import tasks, commands
+import yaml
 
 
 studIPBot = commands.Bot(command_prefix='!')
+with open('tasks.yml', 'r') as file:
+    task_list = yaml.load(file, Loader=yaml.Loader)
+if task_list is None:
+    task_list = []
+tasks_index = 0
 
 
 def known_user():
@@ -20,6 +26,20 @@ def known_user():
     return commands.check(predicate)
 
 
+@tasks.loop(minutes=5)
+async def check_for_updates():
+    if not task_list:
+        return
+    i = check_for_updates.current_loop % len(task_list)
+    print(task_list[i][0], task_list[i][1], task_list[i][2])
+    new_files = studip_utility.check_new_files(task_list[i][0], task_list[i][1])
+    if not new_files:
+        return
+    course_name = studip_utility.get_course_name(task_list[i][0])
+    channel = studIPBot.get_channel(int(task_list[i][2]))
+    await channel.send(f'In {course_name} gibt es neue Dateien')
+    await channel.send(files=new_files)
+
 @studIPBot.event
 async def on_ready():
     print('Logged in as')
@@ -27,6 +47,7 @@ async def on_ready():
     print(studIPBot.user.id)
     print('------')
     await studIPBot.change_presence(activity=discord.Streaming(name="Python Programming!", url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+    check_for_updates.start()
 
 
 @studIPBot.group(aliases=['s'])
@@ -34,6 +55,26 @@ async def studip(ctx):
     print(type(ctx.author))
     if ctx.invoked_subcommand is None:
         await ctx.send('Help is on the way!')
+
+
+@studip.command()
+@known_user()
+async def task(ctx, arg):
+    studip_id = studip_utility.alias_resolver.get(arg)
+    add = True
+    if task_list:
+        for items in task_list:
+            if studip_id in items:
+                items[0] = studip_id
+                items[1] = str(ctx.author)
+                items[2] = ctx.channel.id
+                add = False
+    if add:
+        task_list.append([studip_id, str(ctx.author), ctx.channel.id])
+    with open('tasks.yml', 'w') as out_file:
+        data = yaml.dump(task_list, out_file)
+    course_name = studip_utility.get_course_name(studip_id)
+    await ctx.send(f'Ich habe für {course_name} einen Update Task gestartet.\nNeue Ankündigungen und Dateien werden in diesen Channel gepostet.')
 
 
 @studip.command()

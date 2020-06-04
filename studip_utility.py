@@ -70,7 +70,7 @@ def input_user(user, user_id):
 
 def get_course_name(id):
     result = db.db_query('SELECT title FROM courses WHERE course_id = ?', (id,))
-    return result
+    return result[0]
 
 
 def input_courses(user):
@@ -174,7 +174,6 @@ def recursive_folder(folder_id, user, main_directory, new_files=None):
 
 
 def get_news(user, course=None, page=1):
-    # embed = discord.Embed(title="")
     if course is None:
         r = api_request('studip/news', secrets.get_user_login(user))
         embed = discord.Embed(title='Globale Ankündigungen')
@@ -230,3 +229,6 @@ def formatted_courses_list():
         course_list.append(convert_list(i, ' '))
     formatted_string = convert_list(sorted(course_list), '\n')
     return formatted_string
+
+
+#check_new_files('1f17534b5892a87b9a5c7435ff0d810b', 'Soerili#5977')
