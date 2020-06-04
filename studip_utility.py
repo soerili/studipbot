@@ -229,6 +229,3 @@ def formatted_courses_list():
         course_list.append(convert_list(i, ' '))
     formatted_string = convert_list(sorted(course_list), '\n')
     return formatted_string
-
-
-#check_new_files('1f17534b5892a87b9a5c7435ff0d810b', 'Soerili#5977')
