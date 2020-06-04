@@ -31,7 +31,6 @@ async def check_for_updates():
     if not task_list:
         return
     i = check_for_updates.current_loop % len(task_list)
-    print(task_list[i][0], task_list[i][1], task_list[i][2])
     new_files = studip_utility.check_new_files(task_list[i][0], task_list[i][1])
     if not new_files:
         return
@@ -52,7 +51,6 @@ async def on_ready():
 
 @studIPBot.group(aliases=['s'])
 async def studip(ctx):
-    print(type(ctx.author))
     if ctx.invoked_subcommand is None:
         await ctx.send('Help is on the way!')
 
@@ -81,7 +79,6 @@ async def task(ctx, arg):
 @known_user()
 async def update(ctx, arg):
     file_list = studip_utility.check_new_files(arg, str(ctx.author))
-    print(file_list)
     if file_list:
         await ctx.send('Es gibt folgende neue Dateien für dich:')
         await ctx.send(files=file_list)

@@ -132,24 +132,34 @@ def check_new_files(course, user, main_directory=data_directory):
 
 
 def recursive_folder(folder_id, user, main_directory, new_files=None):
-    print("recursive folder")
     if new_files is None:
         new_files = []
     data = api_request('folder/' + folder_id + '/subfolders', secrets.get_user_login(user))
     if data:
         if type(data) is dict:
             for key, value in data.items():
+                if not value['is_readable']:
+                    continue
+                if value['folder_type'] == 'CourseGroupFolder':
+                    continue
+                if '/' in value['name']:
+                    continue
                 if not os.path.exists(main_directory + value['name']):
                     os.mkdir(main_directory + value['name'])
                 recursive_folder(value['id'], user, main_directory + value['name'] + '/', new_files)
         if type(data) is list:
             for value in data:
+                if not value['is_readable']:
+                    continue
+                if value['folder_type'] == 'CourseGroupFolder':
+                    continue
+                if '/' in value['name']:
+                    continue
                 if not os.path.exists(main_directory + value['name']):
                     os.mkdir(main_directory + value['name'])
                 recursive_folder(value['id'], user, main_directory + value['name'] + '/', new_files)
     files = api_request('folder/' + folder_id + '/files', secrets.get_user_login(user))
     for file in files:
-        print("file")
         if not os.path.isfile(main_directory + file['name']) and not os.path.isfile(
                 os.path.splitext(main_directory + file['name'])[0] + '.html'):
             if file['size'] < 8000000:
