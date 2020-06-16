@@ -68,9 +68,9 @@ def input_user(user, user_id):
     db.db_query('REPLACE INTO users(discord_id, studip_id) VALUES (?,?)', (user, user_id))
 
 
-def get_course_name(id):
-    result = db.db_query('SELECT title FROM courses WHERE course_id = ?', (id,))
-    return result[0]
+def get_course_name(course_id):
+    result = db.db_query('SELECT title FROM courses WHERE course_id = ?', (course_id,))
+    return result
 
 
 def input_courses(user):
@@ -81,6 +81,10 @@ def input_courses(user):
         for key, value in data.items():
             if value['type'] is '1':
                 db.db_query('INSERT OR IGNORE INTO courses(course_id,number,title,lecturers) VALUES (?,?,?,?)',
+                               (value['course_id'], value['number'], value['title'],
+                                next(iter(value['lecturers'].values()))['name']['formatted']))
+            if value['type'] is '23':
+                db.db_query('INSERT OR IGNORE INTO tutorials(tutorial_id,number,title,tutor,student) VALUES (?,?,?,?)',
                                (value['course_id'], value['number'], value['title'],
                                 next(iter(value['lecturers'].values()))['name']['formatted']))
     if type(data) is list:
@@ -113,7 +117,7 @@ def get_semester(user):
 
 def get_studip_id(user):
     query_result = db.db_query('SELECT studip_id FROM users WHERE discord_id = ?', (user,))
-    return query_result[0]
+    return query_result
 
 
 def get_local_folders(course):
@@ -218,10 +222,16 @@ def get_news(user, course=None, page=1):
     return embed
 
 
+
+def upload_exercise_sheet(user, file):
+    print(file.filename)
+    print(user)
+
+
 def add_alias(alias, course):
     query_result = db.db_query('SELECT course_id FROM courses WHERE number = ?', (course,))
     if query_result:
-        alias_resolver.set(alias, query_result[0])
+        alias_resolver.set(alias, query_result)
     result = db.db_query('SELECT number, title FROM courses WHERE number = ?', (course,))
     alias_resolver.to_yaml_file('aliases.yml')
     return convert_list(result, ' ')

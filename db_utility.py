@@ -12,6 +12,7 @@ class DatabaseConnection:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             cursor.execute('CREATE TABLE IF NOT EXISTS courses (course_id text, number text, title text, lecturers text, UNIQUE(course_id))')
+            cursor.execute('CREATE TABLE IF NOT EXISTS tutorials (tutorial_id text, number text, title text, student text, tutor text)')
             conn.commit()
             cursor.execute(
                 'CREATE TABLE IF NOT EXISTS users (discord_id text, studip_id text, UNIQUE(discord_id))')
@@ -36,7 +37,7 @@ class DatabaseConnection:
             if fetchall:
                 query_result = cursor.fetchall()
             else:
-                query_result = cursor.fetchone()
+                query_result = cursor.fetchone()[0]
             return query_result
         except sqlite3.Error as error:
             raise DatabaseError

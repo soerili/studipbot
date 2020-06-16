@@ -11,7 +11,6 @@ from exceptions import *
 from discord.ext import tasks, commands
 import yaml
 
-
 studIPBot = commands.Bot(command_prefix='!')
 with open('tasks.yml', 'r') as file:
     task_list = yaml.load(file, Loader=yaml.Loader)
@@ -39,13 +38,14 @@ async def check_for_updates():
     await channel.send(f'In {course_name} gibt es neue Dateien')
     await channel.send(files=new_files)
 
+
 @studIPBot.event
 async def on_ready():
     print('Logged in as')
     print(studIPBot.user.name)
     print(studIPBot.user.id)
     print('------')
-    await studIPBot.change_presence(activity=discord.Streaming(name="Python Programming!", url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+    await studIPBot.change_presence(activity=discord.Streaming(name="Satisfactory St(r)eam!", url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
     check_for_updates.start()
 
 
@@ -106,7 +106,7 @@ async def files(ctx, arg):
     await show_folder(arg)
 
 
-@studip.command()
+@studip.command(description='test')
 @known_user()
 async def forum(ctx):
     await ctx.send('Not yet implemented!')
@@ -155,6 +155,12 @@ async def login(ctx):
         await ctx.send('Probier es bitte nochmal!')
 
 
+@studip.command(aliases=['kurse', 'module'])
+@known_user()
+async def courses(ctx):
+    ctx.send(studip_utility.formatted_courses_list())
+
+
 @news.error
 @update.error
 @forum.error
@@ -163,6 +169,11 @@ async def studip_error(ctx, error):
         await ctx.send(error.original.message + '\n' + studip_utility.formatted_courses_list())
     else:
         await ctx.send(error.original.message)
+
+
+@alias.error
+async def alias_error(ctx, error):
+    await ctx.send(studip_utility.formatted_courses_list())
 
 
 studip_utility.init()
