@@ -37,7 +37,7 @@ class DatabaseConnection:
             if fetchall:
                 query_result = cursor.fetchall()
             else:
-                query_result = cursor.fetchone()[0]
+                query_result = cursor.fetchone()
             return query_result
         except sqlite3.Error as error:
             raise DatabaseError

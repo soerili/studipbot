@@ -77,6 +77,24 @@ async def task(ctx, arg):
 
 @studip.command()
 @known_user()
+async def stop(ctx, arg):
+    studip_id = studip_utility.alias_resolver.get(arg)
+    if task_list:
+        to_remove = None
+        for items in task_list:
+            if items[0] == studip_id:
+                to_remove = items
+    course_name = studip_utility.get_course_name(studip_id)
+    if to_remove:
+        task_list.remove(to_remove)
+        with open('tasks.yml', 'w') as out_file:
+            data = yaml.dump(task_list, out_file)
+        await ctx.send(f'Ich habe den Task für {course_name} entfernt.')
+    else:
+        await ctx.send(f'Für das Modul {course_name} habe ich gar keinen Task gehabt.')
+
+@studip.command()
+@known_user()
 async def update(ctx, arg):
     file_list = studip_utility.check_new_files(arg, str(ctx.author))
     if file_list:

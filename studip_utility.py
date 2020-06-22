@@ -69,7 +69,7 @@ def input_user(user, user_id):
 
 
 def get_course_name(course_id):
-    result = db.db_query('SELECT title FROM courses WHERE course_id = ?', (course_id,))
+    result = db.db_query('SELECT title FROM courses WHERE course_id = ?', (course_id,))[0]
     return result
 
 
@@ -116,7 +116,7 @@ def get_semester(user):
 
 
 def get_studip_id(user):
-    query_result = db.db_query('SELECT studip_id FROM users WHERE discord_id = ?', (user,))
+    query_result = db.db_query('SELECT studip_id FROM users WHERE discord_id = ?', (user,))[0]
     return query_result
 
 
@@ -229,7 +229,7 @@ def upload_exercise_sheet(user, file):
 
 
 def add_alias(alias, course):
-    query_result = db.db_query('SELECT course_id FROM courses WHERE number = ?', (course,))
+    query_result = db.db_query('SELECT course_id FROM courses WHERE number = ?', (course,))[0]
     if query_result:
         alias_resolver.set(alias, query_result)
     result = db.db_query('SELECT number, title FROM courses WHERE number = ?', (course,))
