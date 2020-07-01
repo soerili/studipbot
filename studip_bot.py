@@ -124,6 +124,14 @@ async def files(ctx, arg):
     await show_folder(arg)
 
 
+@studip.command()
+@known_user()
+async def mensa(ctx):
+    embed_list = studip_utility.get_mensa_menu()
+    for embed in embed_list:
+        await ctx.send(embed=embed)
+
+
 @studip.command(description='test')
 @known_user()
 async def forum(ctx):
