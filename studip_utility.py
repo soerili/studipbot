@@ -1,6 +1,7 @@
 import datetime
 import os
 import sqlite3
+from babel.numbers import format_currency
 
 from os import listdir
 
@@ -43,6 +44,8 @@ def api_request(path, user_auth):
             raise APIError
         data = r.json()
         try:
+            if type(data) is list:
+                return data
             if data['pagination']:
                 if data['pagination']['total'] > data['pagination']['offset'] + 50:
                     return data['collection'] + api_request(path[:-2] + (data['pagination']['offset'] + 50).__str__(),
@@ -222,7 +225,6 @@ def get_news(user, course=None, page=1):
     return embed
 
 
-
 def upload_exercise_sheet(user, file):
     print(file.filename)
     print(user)
@@ -249,3 +251,28 @@ def formatted_courses_list():
         course_list.append(convert_list(i, ' '))
     formatted_string = convert_list(sorted(course_list), '\n')
     return formatted_string
+
+
+def get_mensa_menu():
+    def as_currency(amount):
+        return format_currency(amount, 'EUR', locale='de_DE')
+    data = api_request('mensa/today', secrets.get_user_login('Soerili#5977'))
+    if data:
+        embed_list = [discord.Embed(title=f'Mensaplan vom {datetime.datetime.now().strftime("%d.%m.%y")}')]
+        menus = data['menu']
+        for key, value in menus.items():
+            if key is '1':
+                embed = discord.Embed(title='Pasta')
+            if key is '2':
+                embed = discord.Embed(title='Classic')
+            if key is '3':
+                embed = discord.Embed(title='Culinarium')
+            if key is '4':
+                embed = discord.Embed(title='Wechloy')
+            for key2, values in value.items():
+                item_list = [x['name'] + ' ' + as_currency(x['price']) for x in values]
+                embed.add_field(name=key2, value=convert_list(item_list, '\n'), inline=False)
+            embed_list.append(embed)
+        return embed_list
+    else:
+        return [discord.Embed(title=f'Am {datetime.datetime.now().strftime("%d.%m.%y")} hat die Mensa geschlossen. Lern selber kochen.')]
