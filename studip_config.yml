@@ -2,11 +2,3 @@ db_file: studip.db
 directory: studip/data/
 url: https://elearning.uni-oldenburg.de/api.php/
 semester: Sommersemester 2020
-module:
-    - TEst:
-          - penisasda
-          - asdasd
-          - asdasdd
-    - stochastik: zwei
-    - penis: drei
-    - aids: ier
